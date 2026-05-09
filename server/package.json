@@ -1,0 +1,25 @@
+{
+  "name": "sadaksewa",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/babi214/sadakSewa#readme",
+  "bugs": {
+    "url": "https://github.com/babi214/sadakSewa/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/babi214/sadakSewa.git"
+  },
+  "license": "ISC",
+  "author": "TrevOnAcid",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^8.23.1"
+  }
+}
