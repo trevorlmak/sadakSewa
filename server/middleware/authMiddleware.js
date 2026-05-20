@@ -27,14 +27,18 @@ const protect = async (req, res, next) => {
       });
     }
 
-    if (req.user.passwordChangedAt) {
-      const changedAt = parseInt(req.user.passwordChangedAt.getTime() / 1000, 10);
-      if (decoded.iat < changedAt) {
-        return res.status(401).json({
-          success: false,
-          message: "Password recently changed, please login again",
-        });
-      }
+    if (!req.user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "Your account has been deactivated",
+      });
+    }
+
+    if (req.user.passwordChangedAfter(decoded.iat)) {
+      return res.status(401).json({
+        success: false,
+        message: "Password recently changed, please login again",
+      });
     }
 
     next();
@@ -47,7 +51,7 @@ const protect = async (req, res, next) => {
 };
 
 const adminOnly = (req, res, next) => {
-  if (req.user && req.user.role === "admin") {
+  if (req.user && req.user.role === "admin" && req.user.isActive) {
     next();
   } else {
     res.status(403).json({
@@ -57,4 +61,15 @@ const adminOnly = (req, res, next) => {
   }
 };
 
-module.exports = { protect, adminOnly };
+const workerOnly = (req, res, next) => {
+  if (req.user && ["worker", "admin"].includes(req.user.role) && req.user.isActive) {
+    next();
+  } else {
+    res.status(403).json({
+      success: false,
+      message: "Worker access only",
+    });
+  }
+};
+
+module.exports = { protect, adminOnly, workerOnly };
