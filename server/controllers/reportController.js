@@ -1,6 +1,6 @@
 const Report = require("../models/reportModel");
 
-const VALID_STATUSES = ["pending", "in-progress", "resolved", "rejected"];
+const VALID_STATUSES = ["pending","verified", "in_progress", "resolved", "rejected"];
 
 const createReport = async (req, res) => {
   try {
