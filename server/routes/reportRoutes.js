@@ -6,6 +6,7 @@ const {
   deleteReport,
   updateReportStatus,
   getNearbyReports,
+  updateReport,
 } = require("../controllers/reportController");
 const {
   protect,
@@ -19,6 +20,7 @@ router.get("/nearby", getNearbyReports);
 router.get("/:id", getSingleReport);
 
 router.post("/", protect, createReport);
+router.put("/:id", protect, updateReport);
 router.delete("/:id", protect, deleteReport);
 router.patch("/:id/status", protect, workerOnly, updateReportStatus);
 

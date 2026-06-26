@@ -222,6 +222,39 @@ const getNearbyReports = async (req, res) => {
   }
 };
 
+const updateReport = async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found",
+      });
+    }
+    if (
+      report.reportedBy.toString() !== req.user._id.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+    Object.assign(report, req.body);
+    await report.save();
+    res.status(200).json({
+      success: true,
+      message: "Report updated successfully",
+      report,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   createReport,
   getAllReports,
@@ -229,4 +262,5 @@ module.exports = {
   deleteReport,
   updateReportStatus,
   getNearbyReports,
+  updateReport,
 };
