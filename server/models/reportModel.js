@@ -126,6 +126,10 @@ const reportSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    upvoteCount: {
+      type: Number,
+      default: 0,
+    },
 
     aiAnalysis: {
       type: aiAnalysisSchema,
