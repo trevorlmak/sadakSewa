@@ -1,4 +1,5 @@
 const Report = require("../models/reportModel");
+const User = require("../models/userModel");
 
 const VALID_STATUSES = ["pending", "verified", "in_progress", "resolved", "rejected"];
 
@@ -235,6 +236,26 @@ const updateReportStatus = async (req, res) => {
       });
     }
 
+        if (
+      req.user.role !== "admin" &&
+      (
+        !report.assignedWorker ||
+        report.assignedWorker.toString() !== req.user._id.toString()
+      )
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this report",
+      });
+    }
+
+    if (report.status === "resolved") {
+      return res.status(400).json({
+        success: false,
+        message: "Resolved reports cannot be modified",
+      });
+    }
+
     report.status = status;
     await report.save();
 
@@ -391,6 +412,74 @@ const toggleUpvote = async (req, res) => {
   }
 };
 
+const assignWorker = async (req, res) => {
+  try {
+    const { workerId } = req.body;
+    if (!workerId) {
+      return res.status(400).json({
+        success: false,
+        message: "Worker ID is required",
+      });
+    }
+    const worker = await User.findById(workerId);
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: "Worker not found",
+      });
+    }
+    if (worker.role !== "worker") {
+      return res.status(400).json({
+        success: false,
+        message: "Selected user is not a worker",
+      });
+    }
+    const report = await Report.findById(req.params.id);
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found",
+      });
+    }
+    report.assignedWorker = worker._id;
+    await report.save();
+    await report.populate("assignedWorker", "fullName email");
+    res.status(200).json({
+      success: true,
+      message: "Worker assigned successfully",
+      report,
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
+const getAssignedReports = async (req, res) => {
+  try {
+    const reports = await Report.find({
+      assignedWorker: req.user._id,
+    })
+      .populate("reportedBy", "fullName email profilePicture")
+      .populate("assignedWorker", "fullName email")
+      .sort({ createdAt: -1 });
+    res.status(200).json({
+      success: true,
+      count: reports.length,
+      reports,
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createReport,
   getAllReports,
@@ -401,4 +490,6 @@ module.exports = {
   updateReport,
   getMyReports,
   toggleUpvote,
+  assignWorker,
+  getAssignedReports,
 };
