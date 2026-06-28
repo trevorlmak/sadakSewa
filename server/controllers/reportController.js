@@ -365,6 +365,32 @@ const getMyReports = async (req, res) => {
   }
 };
 
+const toggleUpvote = async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found",
+      });
+    }
+    const added = report.toggleUpvote(req.user._id);
+    await report.save();
+    res.status(200).json({
+      success: true,
+      message: added ? "Report upvoted successfully" : "Upvote removed successfully",
+      upvoteCount: report.upvoteCount,
+      upvotes: report.upvotes,
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createReport,
   getAllReports,
@@ -374,4 +400,5 @@ module.exports = {
   getNearbyReports,
   updateReport,
   getMyReports,
+  toggleUpvote,
 };

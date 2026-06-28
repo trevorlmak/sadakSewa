@@ -8,6 +8,7 @@ const {
   getNearbyReports,
   updateReport,
   getMyReports,
+  toggleUpvote,
 } = require("../controllers/reportController");
 const {
   protect,
@@ -22,8 +23,12 @@ router.get("/my-reports", protect, getMyReports);
 router.get("/:id", getSingleReport);
 
 router.post("/", protect, createReport);
+
 router.put("/:id", protect, updateReport);
-router.delete("/:id", protect, deleteReport);
+
 router.patch("/:id/status", protect, workerOnly, updateReportStatus);
+router.patch("/:id/upvote", protect, toggleUpvote);
+
+router.delete("/:id", protect, deleteReport);
 
 module.exports = router;

@@ -171,6 +171,28 @@ reportSchema.pre("save", function (next) {
   next();
 });
 
+reportSchema.pre("save", function (next) {
+  if (this.isModified("upvotes")) {
+    this.upvoteCount = this.upvotes.length;
+  }
+  next();
+});
+
+reportSchema.methods.toggleUpvote = function (userId) {
+  const id = userId.toString();
+
+  const index = this.upvotes.findIndex(
+    (u) => u.toString() === id
+  );
+
+  if (index === -1) {
+    this.upvotes.push(userId);
+    return true;
+  } else {
+    this.upvotes.splice(index, 1);
+    return false;
+  }
+};
 
 const Report = mongoose.model("Report", reportSchema);
 
