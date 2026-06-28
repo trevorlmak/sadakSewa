@@ -7,6 +7,7 @@ const {
   updateReportStatus,
   getNearbyReports,
   updateReport,
+  getMyReports,
 } = require("../controllers/reportController");
 const {
   protect,
@@ -17,6 +18,7 @@ const router = express.Router();
 
 router.get("/", getAllReports);
 router.get("/nearby", getNearbyReports);
+router.get("/my-reports", protect, getMyReports);
 router.get("/:id", getSingleReport);
 
 router.post("/", protect, createReport);

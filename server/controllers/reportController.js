@@ -343,6 +343,28 @@ const updateReport = async (req, res) => {
   }
 };
 
+const getMyReports = async (req, res) => {
+  try {
+    const reports = await Report.find({
+      reportedBy: req.user._id,
+    })
+      .populate("reportedBy", "fullName email profilePicture")
+      .populate("assignedWorker", "fullName email")
+      .sort({ createdAt: -1 });
+    res.status(200).json({
+      success: true,
+      count: reports.length,
+      reports,
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createReport,
   getAllReports,
@@ -351,4 +373,5 @@ module.exports = {
   updateReportStatus,
   getNearbyReports,
   updateReport,
+  getMyReports,
 };
