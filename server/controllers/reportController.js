@@ -236,26 +236,6 @@ const updateReportStatus = async (req, res) => {
       });
     }
 
-        if (
-      req.user.role !== "admin" &&
-      (
-        !report.assignedWorker ||
-        report.assignedWorker.toString() !== req.user._id.toString()
-      )
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not assigned to this report",
-      });
-    }
-
-    if (report.status === "resolved") {
-      return res.status(400).json({
-        success: false,
-        message: "Resolved reports cannot be modified",
-      });
-    }
-
     report.status = status;
     await report.save();
 
@@ -480,6 +460,122 @@ const getAssignedReports = async (req, res) => {
   }
 };
 
+const getMyDashboard = async (req, res) => {
+  try {
+    const reports = await Report.find({
+      reportedBy: req.user._id,
+    });
+    const dashboard = {
+      totalReports: reports.length,
+      pending: 0,
+      verified: 0,
+      in_progress: 0,
+      resolved: 0,
+      rejected: 0,
+      totalUpvotes: 0,
+    };
+    reports.forEach((report) => {
+      if (dashboard.hasOwnProperty(report.status)) {
+        dashboard[report.status]++;
+      }
+      dashboard.totalUpvotes += report.upvoteCount || 0;
+    });
+    res.status(200).json({
+      success: true,
+      dashboard,
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
+const getWorkerDashboard = async (req, res) => {
+  try {
+    const reports = await Report.find({
+      assignedWorker: req.user._id,
+    });
+    const dashboard = {
+      assigned: reports.length,
+      pending: 0,
+      verified: 0,
+      in_progress: 0,
+      resolved: 0,
+      rejected: 0,
+    };
+    reports.forEach((report) => {
+      if (dashboard.hasOwnProperty(report.status)) {
+        dashboard[report.status]++;
+      }
+    });
+    res.status(200).json({
+      success: true,
+      dashboard,
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
+const getAdminDashboard = async (req, res) => {
+  try {
+    const [
+      totalReports,
+      pending,
+      verified,
+      inProgress,
+      resolved,
+      rejected,
+      totalCitizens,
+      totalWorkers,
+      totalAdmins,
+      recentReports,
+    ] = await Promise.all([
+      Report.countDocuments(),
+      Report.countDocuments({ status: "pending" }),
+      Report.countDocuments({ status: "verified" }),
+      Report.countDocuments({ status: "in_progress" }),
+      Report.countDocuments({ status: "resolved" }),
+      Report.countDocuments({ status: "rejected" }),
+      User.countDocuments({ role: "citizen" }),
+      User.countDocuments({ role: "worker" }),
+      User.countDocuments({ role: "admin" }),
+      Report.find()
+        .populate("reportedBy", "fullName email")
+        .sort({ createdAt: -1 })
+        .limit(5),
+    ]);
+    res.status(200).json({
+      success: true,
+      dashboard: {
+        totalReports,
+        pending,
+        verified,
+        inProgress,
+        resolved,
+        rejected,
+        totalCitizens,
+        totalWorkers,
+        totalAdmins,
+        recentReports,
+      },
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createReport,
   getAllReports,
@@ -492,4 +588,7 @@ module.exports = {
   toggleUpvote,
   assignWorker,
   getAssignedReports,
+  getMyDashboard,
+  getWorkerDashboard,
+  getAdminDashboard,
 };

@@ -11,6 +11,9 @@ const {
   toggleUpvote,
   assignWorker,
   getAssignedReports,
+  getMyDashboard,
+  getWorkerDashboard,
+  getAdminDashboard,
 } = require("../controllers/reportController");
 const {
   protect,
@@ -24,6 +27,16 @@ router.get("/", getAllReports);
 router.get("/nearby", getNearbyReports);
 router.get("/my-reports", protect, getMyReports);
 router.get("/my-assigned", protect, workerOnly, getAssignedReports);
+router.get("/my-dashboard", protect, getMyDashboard);
+router.get("/worker-dashboard", protect, workerOnly, getWorkerDashboard);
+router.get("/admin-dashboard", protect, adminOnly, getAdminDashboard);
+//Test
+router.get("/test", (req, res) => {
+  res.json({
+    success: true,
+    message: "Test route works",
+  });
+});
 router.get("/:id", getSingleReport);
 
 router.post("/", protect, createReport);
