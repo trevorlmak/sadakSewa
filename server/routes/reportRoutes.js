@@ -14,6 +14,7 @@ const {
   getMyDashboard,
   getWorkerDashboard,
   getAdminDashboard,
+  getReportHistory,
 } = require("../controllers/reportController");
 const {
   protect,
@@ -38,6 +39,7 @@ router.get("/test", (req, res) => {
   });
 });
 router.get("/:id", getSingleReport);
+router.get("/:id/history", protect, getReportHistory);
 
 router.post("/", protect, createReport);
 

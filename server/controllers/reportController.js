@@ -1,8 +1,12 @@
 const Report = require("../models/reportModel");
 const User = require("../models/userModel");
+const ReportHistory = require("../models/reportHistoryModel");
 
 const VALID_STATUSES = ["pending", "verified", "in_progress", "resolved", "rejected"];
 
+const logHistory = async (reportId, action, performedBy, details = {}) => {
+  await ReportHistory.create({ report: reportId, action, performedBy, details });
+};
 
 const merge = (left, right, compareFn) => {
   const result = [];
@@ -81,6 +85,8 @@ const createReport = async (req, res) => {
       },
     });
 
+    await logHistory(report._id, "created", req.user._id, { title: report.title });
+
     res.status(201).json({
       success: true,
       message: "Report created successfully",
@@ -126,13 +132,12 @@ const getAllReports = async (req, res) => {
       .populate("reportedBy", "fullName email profilePicture")
       .populate("assignedWorker", "fullName email");
 
-    const sortBy    = req.query.sortBy || "createdAt";   // createdAt | severity | title
-    const order     = req.query.order  || "desc";        // asc | desc
+    const sortBy        = req.query.sortBy || "createdAt";
+    const order         = req.query.order  || "desc";
     const comparatorKey = `${sortBy}_${order}`;
-    const compareFn = SORT_COMPARATORS[comparatorKey] || SORT_COMPARATORS.createdAt_desc;
+    const compareFn     = SORT_COMPARATORS[comparatorKey] || SORT_COMPARATORS.createdAt_desc;
 
-    const sortedReports = mergeSort(rawReports, compareFn);
-
+    const sortedReports    = mergeSort(rawReports, compareFn);
     const paginatedReports = sortedReports.slice(skip, skip + limit);
 
     res.status(200).json({
@@ -201,6 +206,8 @@ const deleteReport = async (req, res) => {
       });
     }
 
+    await logHistory(report._id, "deleted", req.user._id, { title: report.title });
+
     await report.deleteOne();
 
     res.status(200).json({
@@ -236,8 +243,14 @@ const updateReportStatus = async (req, res) => {
       });
     }
 
+    const previousStatus = report.status;
     report.status = status;
     await report.save();
+
+    await logHistory(report._id, "status_changed", req.user._id, {
+      from: previousStatus,
+      to: status,
+    });
 
     res.status(200).json({
       success: true,
@@ -315,6 +328,7 @@ const updateReport = async (req, res) => {
         message: "Not authorized",
       });
     }
+
     const allowedFields = [
       "title",
       "description",
@@ -325,12 +339,18 @@ const updateReport = async (req, res) => {
       "images",
     ];
 
+    const changes = {};
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
+        changes[field] = { from: report[field], to: req.body[field] };
         report[field] = req.body[field];
       }
     });
+
     await report.save();
+
+    await logHistory(report._id, "updated", req.user._id, { changes });
+
     res.status(200).json({
       success: true,
       message: "Report updated successfully",
@@ -377,6 +397,9 @@ const toggleUpvote = async (req, res) => {
     }
     const added = report.toggleUpvote(req.user._id);
     await report.save();
+
+    await logHistory(report._id, added ? "upvoted" : "removed_upvote", req.user._id);
+
     res.status(200).json({
       success: true,
       message: added ? "Report upvoted successfully" : "Upvote removed successfully",
@@ -424,6 +447,12 @@ const assignWorker = async (req, res) => {
     report.assignedWorker = worker._id;
     await report.save();
     await report.populate("assignedWorker", "fullName email");
+
+    await logHistory(report._id, "assigned", req.user._id, {
+      assignedTo: worker._id,
+      workerName: worker.fullName,
+    });
+
     res.status(200).json({
       success: true,
       message: "Worker assigned successfully",
@@ -576,6 +605,34 @@ const getAdminDashboard = async (req, res) => {
   }
 };
 
+const getReportHistory = async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found",
+      });
+    }
+
+    const history = await ReportHistory.find({ report: req.params.id })
+      .populate("performedBy", "fullName email")
+      .sort({ createdAt: 1 });
+
+    res.status(200).json({
+      success: true,
+      count: history.length,
+      history,
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createReport,
   getAllReports,
@@ -591,4 +648,5 @@ module.exports = {
   getMyDashboard,
   getWorkerDashboard,
   getAdminDashboard,
+  getReportHistory,
 };
