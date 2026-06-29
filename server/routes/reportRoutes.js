@@ -1,4 +1,5 @@
 const express = require("express");
+const router = express.Router();
 const {
   createReport,
   getAllReports,
@@ -22,7 +23,6 @@ const {
   adminOnly,
 } = require("../middleware/authMiddleware");
 
-const router = express.Router();
 
 router.get("/", getAllReports);
 router.get("/nearby", getNearbyReports);

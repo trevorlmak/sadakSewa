@@ -1,5 +1,6 @@
 const User = require("../models/userModel");
 const generateToken = require("../utils/generateToken");
+const cloudinary = require("../config/cloudinary");
 
 const registerUser = async (req, res) => {
   try {
@@ -156,6 +157,18 @@ const loginUser = async (req, res) => {
   }
 };
 
+const logoutUser = async (req, res) => {
+  res.cookie("token", "", {
+    httpOnly: true,
+    expires: new Date(0),
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Logged out successfully",
+  });
+};
+
 const getProfile = async (req, res) => {
   try {
     res.status(200).json({
@@ -171,4 +184,90 @@ const getProfile = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getProfile };
+const updateProfile = async (req, res) => {
+  try {
+    const allowedFields = ["fullName", "phone", "municipality"];
+
+    const updates = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    });
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      updates,
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user,
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
+const getPublicIdFromUrl = (url) => {
+  const parts = url.split("/");
+  const versionIndex = parts.findIndex((p) => p.startsWith("v") && !isNaN(p.slice(1)));
+  const relevantParts = parts.slice(versionIndex + 1);
+  const lastPart = relevantParts[relevantParts.length - 1];
+  relevantParts[relevantParts.length - 1] = lastPart.replace(/\.[^/.]+$/, "");
+  return relevantParts.join("/");
+};
+
+const updateProfilePicture = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No image provided",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (user.profilePicture) {
+      try {
+        const publicId = getPublicIdFromUrl(user.profilePicture);
+        await cloudinary.uploader.destroy(publicId);
+      } catch {
+        // old image deletion failed — not critical, continue anyway
+      }
+    }
+
+    user.profilePicture = req.file.path;
+    await user.save();
+
+    const updatedUser = await User.findById(user._id).select("-password");
+
+    res.status(200).json({
+      success: true,
+      message: "Profile picture updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({
+      success: false,
+      message: isDev ? error.message : "Internal server error",
+    });
+  }
+};
+
+module.exports = {
+  registerUser,
+  loginUser,
+  logoutUser,
+  getProfile,
+  updateProfile,
+  updateProfilePicture,
+};
