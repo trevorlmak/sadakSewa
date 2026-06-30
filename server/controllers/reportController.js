@@ -1,6 +1,7 @@
 const Report = require("../models/reportModel");
 const User = require("../models/userModel");
 const ReportHistory = require("../models/reportHistoryModel");
+const cloudinary = require("../config/cloudinary");
 
 const VALID_STATUSES = ["pending", "verified", "in_progress", "resolved", "rejected"];
 
@@ -27,7 +28,7 @@ const mergeSort = (arr, compareFn) => {
   if (arr.length <= 1) return arr;
 
   const mid = Math.floor(arr.length / 2);
-  const left  = mergeSort(arr.slice(0, mid), compareFn);
+  const left = mergeSort(arr.slice(0, mid), compareFn);
   const right = mergeSort(arr.slice(mid), compareFn);
 
   return merge(left, right, compareFn);
@@ -35,7 +36,7 @@ const mergeSort = (arr, compareFn) => {
 
 const SORT_COMPARATORS = {
   createdAt_desc: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-  createdAt_asc:  (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+  createdAt_asc: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
   severity_desc: (a, b) => {
     const order = { high: 3, medium: 2, low: 1 };
     return (order[b.severity] || 0) - (order[a.severity] || 0);
@@ -44,7 +45,7 @@ const SORT_COMPARATORS = {
     const order = { high: 3, medium: 2, low: 1 };
     return (order[a.severity] || 0) - (order[b.severity] || 0);
   },
-  title_asc:  (a, b) => a.title.localeCompare(b.title),
+  title_asc: (a, b) => a.title.localeCompare(b.title),
   title_desc: (a, b) => b.title.localeCompare(a.title),
 };
 
@@ -104,13 +105,13 @@ const createReport = async (req, res) => {
 const getAllReports = async (req, res) => {
   try {
 
-    const page  = parseInt(req.query.page)  || 1;
+    const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
     const filter = {};
 
-    if (req.query.status)   filter.status   = req.query.status;
+    if (req.query.status) filter.status = req.query.status;
     if (req.query.category) filter.category = req.query.category;
     if (req.query.severity) filter.severity = req.query.severity;
 
@@ -120,8 +121,8 @@ const getAllReports = async (req, res) => {
 
     if (req.query.search) {
       filter.$or = [
-        { title:        { $regex: req.query.search, $options: "i" } },
-        { description:  { $regex: req.query.search, $options: "i" } },
+        { title: { $regex: req.query.search, $options: "i" } },
+        { description: { $regex: req.query.search, $options: "i" } },
         { locationName: { $regex: req.query.search, $options: "i" } },
       ];
     }
@@ -132,12 +133,12 @@ const getAllReports = async (req, res) => {
       .populate("reportedBy", "fullName email profilePicture")
       .populate("assignedWorker", "fullName email");
 
-    const sortBy        = req.query.sortBy || "createdAt";
-    const order         = req.query.order  || "desc";
+    const sortBy = req.query.sortBy || "createdAt";
+    const order = req.query.order || "desc";
     const comparatorKey = `${sortBy}_${order}`;
-    const compareFn     = SORT_COMPARATORS[comparatorKey] || SORT_COMPARATORS.createdAt_desc;
+    const compareFn = SORT_COMPARATORS[comparatorKey] || SORT_COMPARATORS.createdAt_desc;
 
-    const sortedReports    = mergeSort(rawReports, compareFn);
+    const sortedReports = mergeSort(rawReports, compareFn);
     const paginatedReports = sortedReports.slice(skip, skip + limit);
 
     res.status(200).json({
@@ -206,8 +207,18 @@ const deleteReport = async (req, res) => {
       });
     }
 
-    await logHistory(report._id, "deleted", req.user._id, { title: report.title });
-
+    if (report.images?.length) {
+      for (const image of report.images) {
+        try {
+          await cloudinary.uploader.destroy(image.publicId);
+        } catch (err) {
+          console.error(
+            `Failed to delete Cloudinary image: ${image.publicId}`,
+            err.message
+          );
+        }
+      }
+    }
     await report.deleteOne();
 
     res.status(200).json({
@@ -341,11 +352,24 @@ const updateReport = async (req, res) => {
 
     const changes = {};
     allowedFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        changes[field] = { from: report[field], to: req.body[field] };
+      if (
+        req.body[field] !== undefined &&
+        JSON.stringify(report[field]) !== JSON.stringify(req.body[field])
+      ) {
+        changes[field] = {
+          from: report[field],
+          to: req.body[field],
+        };
+
         report[field] = req.body[field];
       }
     });
+    if (Object.keys(changes).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No changes detected",
+      });
+    }
 
     await report.save();
 

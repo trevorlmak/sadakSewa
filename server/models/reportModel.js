@@ -72,13 +72,24 @@ const reportSchema = new mongoose.Schema(
     },
 
     images: {
-      type: [String],
-      default: [],
-      validate: {
-        validator: (v) => v.length <= 5,
-        message: "Maximum 5 images allowed",
+  type: [
+    {
+      url: {
+        type: String,
+        required: true,
+      },
+      publicId: {
+        type: String,
+        required: true,
       },
     },
+  ],
+  default: [],
+  validate: {
+    validator: (v) => v.length <= 5,
+    message: "Maximum 5 images allowed",
+  },
+},
 
     reportedBy: {
       type: mongoose.Schema.Types.ObjectId,
